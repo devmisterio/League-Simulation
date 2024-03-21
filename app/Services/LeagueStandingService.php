@@ -5,17 +5,79 @@ namespace App\Services;
 use App\Models\FootballMatch;
 use App\Models\LeagueStandings;
 use App\Models\Team;
+use Illuminate\Database\Eloquent\Collection;
 
 class LeagueStandingService
 {
-    public function createInitialStandingsData()
+    public function getAllTeams(): Collection
     {
-        $teams = Team::all();
-        foreach ($teams as $team) {
-            LeagueStandings::create([
-                'team_id' => $team->id
-            ]);
+        return Team::all();
+    }
+    public function createInitialStandingsIfNotExists(): void
+    {
+        if (LeagueStandings::count() === 0) {
+            $teams = Team::all();
+            foreach ($teams as $team) {
+                LeagueStandings::create([
+                    'team_id' => $team->id,
+                ]);
+            }
         }
+    }
+
+    public function getFormattedStandings()
+    {
+        return LeagueStandings::with("team")
+            ->get()
+            ->map(function ($standing) {
+                $teamId = $standing->team->id;
+
+                // Maçların oynanma durumunu hesapla
+                $matchesPlayed = FootballMatch::where(function ($query) use ($teamId) {
+                    $query->where("home_team_id", $teamId)->whereNotNull("home_score");
+                })
+                    ->orWhere(function ($query) use ($teamId) {
+                        $query->where("away_team_id", $teamId)->whereNotNull("away_score");
+                    })
+                    ->count();
+
+                // Kazanılan maç sayısını hesapla
+                $wins = FootballMatch::where(function ($query) use ($teamId) {
+                    $query
+                        ->where("home_team_id", $teamId)
+                        ->whereColumn("home_score", ">", "away_score");
+                })
+                    ->orWhere(function ($query) use ($teamId) {
+                        $query
+                            ->where("away_team_id", $teamId)
+                            ->whereColumn("away_score", ">", "home_score");
+                    })
+                    ->count();
+
+                // Berabere biten maç sayısını hesapla
+                $draws = FootballMatch::where(function ($query) use ($teamId) {
+                    $query->where("home_team_id", $teamId)->orWhere("away_team_id", $teamId);
+                })
+                    ->whereColumn("home_score", "=", "away_score")
+                    ->count();
+
+                // Kaybedilen maç sayısını hesapla
+                $losses = $matchesPlayed - $wins - $draws;
+                $points = ($wins * 3) + $draws;
+
+                return [
+                    "id" => $standing->team->id,
+                    "name" => $standing->team->name,
+                    "played" => $matchesPlayed,
+                    "won" => $wins,
+                    "drawn" => $draws,
+                    "lost" => $losses,
+                    "points" => $points,
+                    "goalDifference" => $standing->goals_difference
+                ];
+            })
+            ->sortByDesc('points')
+            ->values();
     }
 
     public function updateStandings(FootballMatch $match)

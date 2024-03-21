@@ -11,12 +11,14 @@ const props = defineProps({
 
 let leagueData = ref(props.league);
 const matchesData = ref(props.currentWeekMatches);
+const isLoading = ref(false);
 
 const shouldDisableButton = computed(() => {
     return leagueData.value.length > 0 && leagueData.value[0].played === 6;
 });
 
 function playWeek() {
+    isLoading.value = true;
     axios.get('/play-week')
         .then(res => {
             leagueData.value = res.data.league;
@@ -26,11 +28,19 @@ function playWeek() {
 
             console.log(res)
         })
+        .finally(() => {
+            isLoading.value = false;
+        });
 }
 
 </script>
 
 <template>
+    <div v-if="isLoading" class="d-flex justify-content-center my-3">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
     <div class="container py-5">
         <h1 class="mb-4 text-center">Simulation</h1>
         <div class="row">

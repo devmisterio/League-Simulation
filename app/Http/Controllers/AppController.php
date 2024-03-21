@@ -2,138 +2,35 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\FootballMatch;
-use App\Models\LeagueStandings;
-use App\Models\Team;
 use App\Services\FixtureService;
 use App\Services\LeagueStandingService;
 use App\Services\MatchSimulationService;
-use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class AppController extends Controller
 {
-    public function index()
+    public function index(LeagueStandingService $service): Response
     {
-        return Inertia::render('Index', [
-            'teams' => Team::all()
-        ]);
+        $teams = $service->getAllTeams();
+
+        return Inertia::render('Index', compact('teams'));
     }
 
-    public function fixtures()
+    public function fixtures(FixtureService $service): Response
     {
-        FootballMatch::truncate();
-        LeagueStandings::truncate();
+        $weeklyFixtures = $service->generateAndRetrieveFixtures();
 
-        $fixtureService = new FixtureService();
-        $fixtureService->generateFixtures();
-
-        $weeklyFixtures = FootballMatch::with(["homeTeam", "awayTeam"])
-            ->get()
-            ->groupBy(function ($match) {
-                return Carbon::parse($match->match_date)->format("W"); // Group by week number
-            })
-            ->map(function ($weekMatches) {
-                return $weekMatches->map(function ($match) {
-                    return [
-                        "home_team" => $match->homeTeam->name,
-                        "away_team" => $match->awayTeam->name
-                    ];
-                });
-            })
-            ->toArray();
-
-
-        return Inertia::render('Fixtures', [
-            'weeklyFixtures' => $weeklyFixtures
-        ]);
+        return Inertia::render('Fixtures', compact('weeklyFixtures'));
     }
 
-    public function simulation(LeagueStandingService $leagueStandingService)
+    public function simulation(LeagueStandingService $leagueStandingService, MatchSimulationService $matchSimulationService): Response
     {
-        // Check if standings data is empty and create initial data if it is
-        if (LeagueStandings::count() === 0) {
-            $leagueStandingService->createInitialStandingsData();
-        }
+        $leagueStandingService->createInitialStandingsIfNotExists();
 
-        // Fetch the standings data
-        $league = LeagueStandings::with("team")
-            ->get()
-            ->map(function ($standing) {
-                $teamId = $standing->team->id;
-
-                // Maçların oynanma durumunu hesapla
-                $matchesPlayed = FootballMatch::where(function ($query) use ($teamId) {
-                    $query->where("home_team_id", $teamId)->whereNotNull("home_score");
-                })
-                    ->orWhere(function ($query) use ($teamId) {
-                        $query->where("away_team_id", $teamId)->whereNotNull("away_score");
-                    })
-                    ->count();
-
-                // Kazanılan maç sayısını hesapla
-                $wins = FootballMatch::where(function ($query) use ($teamId) {
-                    $query
-                        ->where("home_team_id", $teamId)
-                        ->whereColumn("home_score", ">", "away_score");
-                })
-                    ->orWhere(function ($query) use ($teamId) {
-                        $query
-                            ->where("away_team_id", $teamId)
-                            ->whereColumn("away_score", ">", "home_score");
-                    })
-                    ->count();
-
-                // Berabere biten maç sayısını hesapla
-                $draws = FootballMatch::where(function ($query) use ($teamId) {
-                    $query->where("home_team_id", $teamId)->orWhere("away_team_id", $teamId);
-                })
-                    ->whereColumn("home_score", "=", "away_score")
-                    ->count();
-
-                // Kaybedilen maç sayısını hesapla
-                $losses = $matchesPlayed - $wins - $draws;
-                $points = ($wins * 3) + $draws;
-
-                return [
-                    "id" => $standing->team->id,
-                    "name" => $standing->team->name,
-                    "played" => $matchesPlayed,
-                    "won" => $wins,
-                    "drawn" => $draws,
-                    "lost" => $losses,
-                    "points" => $points,
-                    "goalDifference" => $standing->goals_difference
-                ];
-            })
-            ->sortByDesc('points')
-            ->values();
-
-        $firstMatch = FootballMatch::orderBy("id", "asc")->first("match_date");
-        $leagueStartDate = Carbon::parse($firstMatch->match_date);
-
-        $currentWeekMatches = FootballMatch::with(["homeTeam", "awayTeam"])
-            ->whereNull("home_score")
-            ->orderBy("id", "asc") // Ensure they are ordered by date
-            ->take(2)
-            ->get();
-
-        if ($currentWeekMatches->isEmpty()) {
-            // If no matches with null scores, get the last 2 matches from the table
-            $currentWeekMatches = FootballMatch::with(["homeTeam", "awayTeam"])
-                ->orderBy("id", "desc") // Order by descending to get the last matches
-                ->take(2)
-                ->get()
-                ->reverse(); // Reverse to maintain chronological order
-        }
-
-        $currentWeekMatches->transform(function ($match) use ($leagueStartDate) {
-            // Calculate the week number based on the match date and league start date
-            $match->week_number =
-                (int) Carbon::parse($leagueStartDate)->diffInWeeks($match->match_date) + 1;
-            return $match;
-        });
-
+        $league = $leagueStandingService->getFormattedStandings();
+        $currentWeekMatches = $matchSimulationService->getCurrentWeekMatches();
 
 
         return Inertia::render('Simulation', [
@@ -142,100 +39,13 @@ class AppController extends Controller
         ]);
     }
 
-    public function playWeek()
+    public function playWeek(MatchSimulationService $matchSimulationService, LeagueStandingService $leagueStandingService): JsonResponse
     {
-        $matches = FootballMatch::whereNull("home_score")->take(2)->get();
+        $matchSimulationService->playAndUpdateWeek();
 
-        $matchSimulationService = new MatchSimulationService();
-        $leagueStandingService = new LeagueStandingService();
+        $league = $leagueStandingService->getFormattedStandings();
+        $currentWeekMatches = $matchSimulationService->getCurrentWeekMatches();
 
-        foreach ($matches as $match) {
-            $matchSimulationService->simulateMatch($match);
-            $leagueStandingService->updateStandings($match);
-        }
-
-        // Fetch the standings data
-        $league = LeagueStandings::with("team")
-            ->get()
-            ->map(function ($standing) {
-                $teamId = $standing->team->id;
-
-                // Maçların oynanma durumunu hesapla
-                $matchesPlayed = FootballMatch::where(function ($query) use ($teamId) {
-                    $query->where("home_team_id", $teamId)->whereNotNull("home_score");
-                })
-                    ->orWhere(function ($query) use ($teamId) {
-                        $query->where("away_team_id", $teamId)->whereNotNull("away_score");
-                    })
-                    ->count();
-
-                // Kazanılan maç sayısını hesapla
-                $wins = FootballMatch::where(function ($query) use ($teamId) {
-                    $query
-                        ->where("home_team_id", $teamId)
-                        ->whereColumn("home_score", ">", "away_score");
-                })
-                    ->orWhere(function ($query) use ($teamId) {
-                        $query
-                            ->where("away_team_id", $teamId)
-                            ->whereColumn("away_score", ">", "home_score");
-                    })
-                    ->count();
-
-                // Berabere biten maç sayısını hesapla
-                $draws = FootballMatch::where(function ($query) use ($teamId) {
-                    $query->where("home_team_id", $teamId)->orWhere("away_team_id", $teamId);
-                })
-                    ->whereColumn("home_score", "=", "away_score")
-                    ->count();
-
-                // Kaybedilen maç sayısını hesapla
-                $losses = $matchesPlayed - $wins - $draws;
-                $points = ($wins * 3) + $draws;
-
-                return [
-                    "id" => $standing->team->id,
-                    "name" => $standing->team->name,
-                    "played" => $matchesPlayed,
-                    "won" => $wins,
-                    "drawn" => $draws,
-                    "lost" => $losses,
-                    "points" => $points,
-                    "goalDifference" => $standing->goals_difference
-                ];
-            })
-            ->sortByDesc('points');;
-
-        $firstMatch = FootballMatch::orderBy("id", "asc")->first("match_date");
-        $leagueStartDate = Carbon::parse($firstMatch->match_date);
-
-        $currentWeekMatches = FootballMatch::with(["homeTeam", "awayTeam"])
-            ->whereNull("home_score")
-            ->orderBy("id", "asc") // Ensure they are ordered by date
-            ->take(2)
-            ->get();
-
-        if ($currentWeekMatches->isEmpty()) {
-            // If no matches with null scores, get the last 2 matches from the table
-            $currentWeekMatches = FootballMatch::with(["homeTeam", "awayTeam"])
-                ->orderBy("id", "desc") // Order by descending to get the last matches
-                ->take(2)
-                ->get()
-                ->reverse(); // Reverse to maintain chronological order
-        }
-
-        $currentWeekMatches->transform(function ($match) use ($leagueStartDate) {
-            // Calculate the week number based on the match date and league start date
-            $match->week_number =
-                (int) Carbon::parse($leagueStartDate)->diffInWeeks($match->match_date) + 1;
-            return $match;
-        });
-
-
-
-        return response()->json([
-            'league' => $league,
-            'currentWeekMatches' => $currentWeekMatches
-        ]);
+        return response()->json(compact('league', 'currentWeekMatches'));
     }
 }

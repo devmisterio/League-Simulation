@@ -3,12 +3,35 @@
 namespace App\Services;
 
 use App\Models\FootballMatch;
+use App\Models\LeagueStandings;
 use App\Models\Team;
 use Carbon\Carbon;
 
 class FixtureService
 {
-    public function generateFixtures()
+    public function generateAndRetrieveFixtures(): array
+    {
+        FootballMatch::truncate();
+        LeagueStandings::truncate();
+
+        $this->generateFixtures();
+
+        return FootballMatch::with(["homeTeam", "awayTeam"])
+            ->get()
+            ->groupBy(function ($match) {
+                return Carbon::parse($match->match_date)->format("W"); // Group by week number
+            })
+            ->map(function ($weekMatches) {
+                return $weekMatches->map(function ($match) {
+                    return [
+                        "home_team" => $match->homeTeam->name,
+                        "away_team" => $match->awayTeam->name
+                    ];
+                });
+            })
+            ->toArray();
+    }
+    private function generateFixtures()
     {
         $teams = Team::all();
 
