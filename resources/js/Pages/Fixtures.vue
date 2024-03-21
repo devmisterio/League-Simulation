@@ -11,7 +11,7 @@
                 />
             </div>
         </div>
-        <a class="mt-4 btn btn-primary" href="#" role="button">Start Simulation</a>
+        <a class="mt-4 btn btn-primary" href="/simulation" role="button">Start Simulation</a>
     </div>
 </template>
 

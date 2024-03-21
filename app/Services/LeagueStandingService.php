@@ -4,9 +4,20 @@ namespace App\Services;
 
 use App\Models\FootballMatch;
 use App\Models\LeagueStandings;
+use App\Models\Team;
 
 class LeagueStandingService
 {
+    public function createInitialStandingsData()
+    {
+        $teams = Team::all();
+        foreach ($teams as $team) {
+            LeagueStandings::create([
+                'team_id' => $team->id
+            ]);
+        }
+    }
+
     public function updateStandings(FootballMatch $match)
     {
         $homeTeamStanding = LeagueStandings::firstOrCreate(['team_id' => $match->home_team_id]);
