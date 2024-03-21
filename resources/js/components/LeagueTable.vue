@@ -15,6 +15,7 @@ defineProps({
                 <th class="header">D</th>
                 <th class="header">L</th>
                 <th class="header">GD</th>
+                <th class="header">Points</th>
             </tr>
             </thead>
             <tbody>
@@ -25,6 +26,7 @@ defineProps({
                 <td>{{ team.drawn }}</td>
                 <td>{{ team.lost }}</td>
                 <td>{{ team.goalDifference }}</td>
+                <td>{{ team.points }}</td>
             </tr>
             </tbody>
         </table>
