@@ -6,11 +6,13 @@ import axios from "axios";
 
 const props = defineProps({
     league: Array,
-    currentWeekMatches: Array
+    currentWeekMatches: Array,
+    predicts: Object
 });
 
 let leagueData = ref(props.league);
 const matchesData = ref(props.currentWeekMatches);
+let predictsData = ref(props.predicts);
 const isLoading = ref(false);
 
 const shouldDisableButton = computed(() => {
@@ -23,8 +25,8 @@ function playWeek() {
         .then(res => {
             leagueData.value = res.data.league;
             matchesData.value = res.data.currentWeekMatches;
-
-            console.log(res)
+            predictsData.value = res.data.predicts;
+            console.log(res.data)
         })
         .finally(() => {
             isLoading.value = false;
@@ -37,6 +39,7 @@ function playAllyWeek() {
         .then(res => {
             leagueData.value = res.data.league;
             matchesData.value = res.data.currentWeekMatches;
+            predictsData.value = res.data.predicts;
 
             console.log(res)
         })
@@ -60,7 +63,7 @@ function playAllyWeek() {
                 <LeagueTable :teams="leagueData"/>
             </div>
             <div class="col-lg-3">
-                <ChampionshipPredictions :teams="league"/>
+                <ChampionshipPredictions :teams="predictsData"/>
             </div>
             <div class="col-lg-3">
                 <div class="card">
@@ -83,7 +86,7 @@ function playAllyWeek() {
                 <button :disabled="shouldDisableButton" @click="playWeek" type="button" class="btn btn-primary">Play Next Week</button>
             </div>
             <div class="d-grid col-3 gap-2   mx-auto">
-                <button type="button" class="btn btn-danger">Reset Data</button>
+                <a class="btn btn-danger" href="/fixtures" role="button">Reset Data</a>
             </div>
         </div>
     </div>
