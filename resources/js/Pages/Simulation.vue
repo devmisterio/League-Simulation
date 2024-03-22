@@ -22,9 +22,21 @@ function playWeek() {
     axios.get('/play-week')
         .then(res => {
             leagueData.value = res.data.league;
-            if (res.data.currentWeekMatches.length > 0) {
-                matchesData.value = res.data.currentWeekMatches;
-            }
+            matchesData.value = res.data.currentWeekMatches;
+
+            console.log(res)
+        })
+        .finally(() => {
+            isLoading.value = false;
+        });
+}
+
+function playAllyWeek() {
+    isLoading.value = true;
+    axios.get('/play-all-week')
+        .then(res => {
+            leagueData.value = res.data.league;
+            matchesData.value = res.data.currentWeekMatches;
 
             console.log(res)
         })
@@ -65,7 +77,7 @@ function playWeek() {
         </div>
         <div class="row justify-content-center pt-4">
             <div class="d-grid col-3 gap-2  mx-auto">
-                <button :disabled="shouldDisableButton" type="button" class="btn btn-primary">Play All Weeks</button>
+                <button :disabled="shouldDisableButton" @click="playAllyWeek" type="button" class="btn btn-primary">Play All Weeks</button>
             </div>
             <div class="d-grid col-3 gap-2  mx-auto">
                 <button :disabled="shouldDisableButton" @click="playWeek" type="button" class="btn btn-primary">Play Next Week</button>

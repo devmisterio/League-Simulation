@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Models\FootballMatch;
 use App\Models\LeagueStandings;
 use App\Models\Team;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection;
 
 class LeagueStandingService
 {
@@ -13,19 +13,17 @@ class LeagueStandingService
     {
         return Team::all();
     }
+
     public function createInitialStandingsIfNotExists(): void
     {
         if (LeagueStandings::count() === 0) {
-            $teams = Team::all();
-            foreach ($teams as $team) {
-                LeagueStandings::create([
-                    'team_id' => $team->id,
-                ]);
-            }
+            Team::all()->each(function ($team) {
+                LeagueStandings::create(['team_id' => $team->id]);
+            });
         }
     }
 
-    public function getFormattedStandings()
+    public function getFormattedStandings(): Collection
     {
         return LeagueStandings::with("team")
             ->get()
