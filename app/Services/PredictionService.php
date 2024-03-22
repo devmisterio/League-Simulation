@@ -10,6 +10,9 @@ use Illuminate\Support\Collection;
 
 class PredictionService
 {
+    private const HOME_ADVANTAGE_WEIGHT = 1.1;
+    private const RANDOMNESS_FACTOR = 10;
+
     public function calculateChampionshipRates(): Collection
     {
         $standings = $this->predictLeagueStandings();
@@ -37,14 +40,16 @@ class PredictionService
 
         return $standings->sortByDesc('predicted_points');
     }
+
     private function calculatePotentialPoints($team): int
     {
         $remainingMatches = $this->getRemainingMatchesForTeam($team->id);
         $potentialPoints = 0;
 
         foreach ($remainingMatches as $match) {
-            $opponentStrength = $this->getTeamStrength($match->away_team_id);
-            $potentialPoints += $this->estimateMatchOutcome($team->strength, $opponentStrength);
+            $isHome = $match->home_team_id === $team->id;
+            $opponentStrength = $this->getTeamStrength($isHome ? $match->away_team_id : $match->home_team_id);
+            $potentialPoints += $this->estimateMatchOutcome($team->strength, $opponentStrength, $isHome);
         }
 
         return $potentialPoints;
@@ -57,19 +62,25 @@ class PredictionService
                 ->orWhere('away_team_id', $teamId);
         })->whereNull('home_score')->get();
     }
+
     private function getTeamStrength($teamId): int
     {
         return Team::find($teamId)->strength;
     }
 
-    private function estimateMatchOutcome($teamStrength, $opponentStrength): int
+    private function estimateMatchOutcome($teamStrength, $opponentStrength, $isHome): int
     {
-        if ($teamStrength > $opponentStrength) {
-            return 3;
-        } elseif ($teamStrength == $opponentStrength) {
-            return 1;
+        $adjustedTeamStrength = $isHome ? $teamStrength * self::HOME_ADVANTAGE_WEIGHT : $teamStrength;
+        $strengthDifference = $adjustedTeamStrength - $opponentStrength;
+
+        $strengthDifference += rand(-self::RANDOMNESS_FACTOR, self::RANDOMNESS_FACTOR);
+
+        if ($strengthDifference > 20) {
+            return 3; // Win
+        } elseif ($strengthDifference > -20) {
+            return 1; // Draw
         } else {
-            return 0;
+            return 0; // Loss
         }
     }
 }
