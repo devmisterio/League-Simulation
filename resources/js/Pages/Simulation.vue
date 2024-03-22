@@ -26,7 +26,6 @@ function playWeek() {
             leagueData.value = res.data.league;
             matchesData.value = res.data.currentWeekMatches;
             predictsData.value = res.data.predicts;
-            console.log(res.data)
         })
         .finally(() => {
             isLoading.value = false;
@@ -40,8 +39,6 @@ function playAllyWeek() {
             leagueData.value = res.data.league;
             matchesData.value = res.data.currentWeekMatches;
             predictsData.value = res.data.predicts;
-
-            console.log(res)
         })
         .finally(() => {
             isLoading.value = false;

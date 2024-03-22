@@ -8,15 +8,31 @@ use App\Models\Team;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
+/**
+ * Service class responsible for managing football match fixtures.
+ */
 class FixtureService
 {
+    /**
+     * Collection of teams.
+     *
+     * @var Collection
+     */
     private Collection $teams;
 
+    /**
+     * FixtureService constructor.
+     */
     public function __construct()
     {
         $this->teams = Team::all();
     }
 
+    /**
+     * Generates new fixtures and retrieves them in a formatted array.
+     *
+     * @return array An array of formatted fixtures.
+     */
     public function generateAndRetrieveFixtures(): array
     {
         $this->resetExistingData();
@@ -25,12 +41,18 @@ class FixtureService
         return $this->formatFixturesForResponse();
     }
 
+    /**
+     * Resets existing match and league standings data.
+     */
     private function resetExistingData(): void
     {
         FootballMatch::truncate();
         LeagueStandings::truncate();
     }
 
+    /**
+     * Generates fixtures based on a predefined pattern.
+     */
     private function generateFixtures(): void
     {
         $fixturePattern = $this->getFixturePattern();
@@ -44,6 +66,11 @@ class FixtureService
         }
     }
 
+    /**
+     * Defines a pattern for football match fixtures.
+     *
+     * @return array An array representing the fixture pattern.
+     */
     private function getFixturePattern(): array
     {
         return [
@@ -56,6 +83,12 @@ class FixtureService
         ];
     }
 
+    /**
+     * Creates a football match with given team pair and match date.
+     *
+     * @param array $matchPair Array containing IDs of the home and away teams.
+     * @param Carbon $matchDate The date of the match.
+     */
     private function createMatch(array $matchPair, Carbon $matchDate): void
     {
         FootballMatch::create([
@@ -65,6 +98,11 @@ class FixtureService
         ]);
     }
 
+    /**
+     * Formats and groups fixtures for response.
+     *
+     * @return array An array of grouped and formatted fixtures.
+     */
     private function formatFixturesForResponse(): array
     {
         return FootballMatch::with(["homeTeam", "awayTeam"])
@@ -74,6 +112,12 @@ class FixtureService
             ->toArray();
     }
 
+    /**
+     * Formats a week's matches for response.
+     *
+     * @param Collection $weekMatches Matches of a specific week.
+     * @return Collection A collection of formatted week matches.
+     */
     private function formatWeekMatches($weekMatches): Collection
     {
         return $weekMatches->map(function ($match) {
