@@ -22,6 +22,8 @@ To set up the project:
 3. Configure your database settings in the `.env` file.
 4. Run migrations using `php artisan migrate`.
 5. Seed the database using `php artisan db:seed --class=TeamSeeder`
+6. Run `npm install` to install frontend dependencies.
+7. Build Vue files with `npm run build`
 
 ## Usage
 - Generate fixtures for the league.
