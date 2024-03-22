@@ -26,6 +26,7 @@ To set up the project:
 7. Build Vue files with `npm run build`
 
 ## Usage
+- Run `php artisan serve`
 - Generate fixtures for the league.
 - Simulate matches either one week at a time or for the entire league schedule.
 - View and track the league standings as matches are played.
